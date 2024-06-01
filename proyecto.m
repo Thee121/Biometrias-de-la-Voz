@@ -7,14 +7,14 @@
 % Longitud de la ventana:            l_v
 % Numero de coeficientes del modelo LPC: n_coef
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- close all;
- clear;
+close all;
+clear;
 
- n_fichero = 'aeiou2.wav';
+n_fichero = 'aeiou2.wav';
 
 [x,fs]=audioread(n_fichero);
 
-l_v = 512;                                  % longitud de la ventana
+l_v = 1028;                                  % longitud de la ventana
 desplaza = l_v/2;                           % desplazamiento
 n_trozos = floor(length(x)/desplaza) -1;    % trozos sobre los que evaluar la LPC
 n_coef=14;                                  % Numero coef LPC
@@ -41,12 +41,10 @@ frecs_f=zeros(n_coef/2,n_trozos);
 
 Zi=zeros(1,n_coef); % Condiciones iniciales de los filtros
 tracto = []; % señal de tracto vocal (respuesta al impulso del tracto)
-pulso  = []; % señal de pulso glotico
 recompuesto = [];
-recompuesto2 = [];
-recompuesto3 = [];
+pulso = [];
 Zi_rec=zeros(1,n_coef); % Condiciones iniciales de los filtros para la señal recompuesta
-matriz_a_lpc = zeros(n_coef, n_trozos);
+w = warning('off', 'all');
 for i=1:n_trozos
     trozo=x((i-1)*desplaza+1 : (i-1)*desplaza+l_v);
     umbral=0.01;
@@ -55,7 +53,6 @@ for i=1:n_trozos
     %Se guardan los coeficientes en una matriz para tener toda la
     %informacion del tracto
     matr_a_lpc(:,i)=a_lpc;
-    %[H,f]=freqz(1,a_lpc,l_v,fs);
     [H,~]=freqz(1,a_lpc,l_v/2+1,fs);
     matr_lpc(:,i)=20*log10(abs(H)+eps);
     %Extracción de polos
@@ -64,7 +61,7 @@ for i=1:n_trozos
     r=r(imag(r)>umbral);
     frecs=sort(atan2(imag(r),real(r))*fs/(2*pi));
     frecs_f(1:length(frecs),i)=frecs;
-    % Filtro inverso del traco vocal
+    % Filtro inverso del tracto vocal
     b_inv=a_lpc;
     a_inv=1;
     % Proceso de filtrado con condiciones iniciales
@@ -76,32 +73,18 @@ for i=1:n_trozos
     tracto=[tracto, (trozo_tracto(1:desplaza))'];
 end
 
-% Recomposición de voz con las señales de pulso y tracto
-pulso_r= [pulso(2000:length(pulso)-2000),pulso(2000:length(pulso)-2000),pulso(2000:length(pulso)-2000)];
-pulso_r1= resample (pulso_r,6,8);
-pulso_r2= resample (pulso_r,4,2);
+% Cambiar la entonación (modificar la frecuencia fundamental)
+desired_pitch_factor = 500; % Factor de cambio de entonación (1.2 significa aumentar un 20%)
 
+pulso_resampled = resample(pulso, desired_pitch_factor*fs, fs);
+
+% Recomposición de voz con las señales de pulso y tracto con entonación modificada
 for i=1:n_trozos-1
-    trozo = pulso((i-1)*desplaza+1 : (i-1)*desplaza+l_v);
+    trozo = pulso_resampled((i-1)*desplaza+1 : (i-1)*desplaza+l_v);
     a_lpc = matr_a_lpc(:,i);
     [trozo_recompuesto, Zi_rec]=filter(1,a_lpc,trozo(1:desplaza),Zi_rec);
     recompuesto = [recompuesto, (trozo_recompuesto(1:desplaza))];
 end
-
-for i=1:n_trozos-1
-    trozo = pulso_r1((i-1)*desplaza+1 : (i-1)*desplaza+l_v);
-    a_lpc = matr_a_lpc(:,i);
-    [trozo_recompuesto, Zi_rec]=filter(1,a_lpc,trozo(1:desplaza),Zi_rec);
-    recompuesto2 = [recompuesto2, (trozo_recompuesto(1:desplaza))];
-end
-
-for i=1:n_trozos-1
-    trozo = pulso_r2((i-1)*desplaza+1 : (i-1)*desplaza+l_v);
-    a_lpc = matr_a_lpc(:,i);
-    [trozo_recompuesto, Zi_rec]=filter(1,a_lpc,trozo(1:desplaza),Zi_rec);
-    recompuesto3 = [recompuesto3, (trozo_recompuesto(1:desplaza))];
-end
-
 
 figure(1); 
 specgram(tracto,l_v/2,fs,hamming(256),0) 
@@ -149,8 +132,6 @@ ylabel('Frecuencia (Hz)');
 zlabel('Amplitud (dB)');
 shading interp;
 
-
-
 figure(5);
 eje_t2=0:1/fs:(length(pulso)-1)/fs;
 plot(eje_t2,pulso);
@@ -175,7 +156,6 @@ figure(8);
 specgram(onda_glot,512,fs);
 title('Espectro de la onda glotica');
 
-
 figure(9);
 eje = 1:length(onda_glot);
 plot(eje,pulso,'b', eje, onda_glot*100,'r');
@@ -193,9 +173,7 @@ audiowrite(n_f_onda,onda_glot,fs);
 tracto=tracto/max(abs(tracto));
 audiowrite(n_f_tracto,tracto,fs);
 
-
-
-sound(x,fs);
+%sound(x,fs);
 pause;
 figure(10);
 spectrogram(x,512,256,512,fs,'yaxis');
@@ -203,14 +181,3 @@ sound(recompuesto,fs);
 pause;
 figure(11);
 spectrogram(recompuesto,512,256,512,fs,'yaxis');
-sound(recompuesto2,fs);
-pause;
-figure(12);
-spectrogram(recompuesto2,512,256,512,fs,'yaxis');
-
-sound(recompuesto3,fs);
-pause;
-figure(13);
-spectrogram(recompuesto3,1024,256,1024,fs,'yaxis');
-
-
