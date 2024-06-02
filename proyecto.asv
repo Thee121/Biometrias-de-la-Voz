@@ -26,17 +26,18 @@ prompt = 'Introducir nombre del fichero de audio: ';
 n_fichero = input(prompt, "s"); %Por ejemplo, AEIOU.wav
 
 % Parámetros de cambio de tiempo
-prompt = 'Introducir parámetro de cambio de tiempo (0.3 a 1.7): ';
-tempo_factor = input(prompt); %Solo puede tener valor entre 0.3 y 1.7
+prompt = 'Introducir parámetro de cambio de tiempo: ';
+tempo_factor = input(prompt); %Por ejemplo, 1.5
 
 [x, fs] = audioread(n_fichero);
 x_tempo_changed = change_tempo(x, fs, tempo_factor);
 
-l_v = 4096; % Longitud de la ventana
-desplaza = l_v / 2; % Desplazamiento
-n_trozos = floor(length(x) / desplaza) - 1; % Trozos sobre los que evaluar la LPC
-n_coef = 32; % Número de coeficientes LPC
-trama = floor(n_trozos / 2); % Trama individual a pintar
+l_v = 512;                                  % Longitud de la ventana
+desplaza = l_v / 2;                          % Desplazamiento
+n_trozos = floor(length(x) / desplaza) - 1;  % Trozos sobre los que evaluar la LPC
+n_coef = 14;                                 % Número de coeficientes LPC
+n_formantes = min(5, n_coef / 2 - 1);
+trama = floor(n_trozos / 2);                 % Trama individual a pintar
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -130,7 +131,9 @@ shading interp;
 title('Espectro LPC');
 xlabel('Tiempo (s)');
 ylabel('Frecuencia (Hz)');
+
 [B, f, t] = specgram(x, l_v, fs);
+
 
 figure(2);
 eje_f = (0:l_v/2) * fs / l_v;
@@ -142,6 +145,7 @@ a_v = 1;
 b_v = [1 -1];
 D_envolv = filter(b_v, a_v, trama_lpc);
 D_D_envolv = filter(b_v, a_v, D_envolv);
+
 plot(eje_lpc, trama_lpc, 'r', eje_f, trama_fourier, 'b', eje_f, D_envolv, 'k', eje_f, D_D_envolv, 'g');
 title('FFT y envolvente LPC')
 xlabel('Frecuencia (Hz)');
@@ -162,29 +166,32 @@ onda_glot_reconstruida = filter(b, a, pulso_resampled);
 onda_glot = filter(b, a, pulso);
 
 figure(4);
-eje = 0:1/fs:(length(pulso_resampled)-1)/fs;
+lin = linspace(0,10,50);
+y1 = sin(x);
+y2 = rand(50,1);
+tiledlayout(2,1)
+
+eje = 1:length(onda_glot_reconstruida);
 eje2 = 0:1/fs:(length(pulso)-1)/fs;
-subplot(2,1,1) % 2 rows, 1 column, first position
 plot(eje, pulso_resampled, 'b', eje, onda_glot_reconstruida*100, 'r');
 title('Pulso y Onda Reconstruida');
 xlabel('Tiempo (s)');
 ylabel('Amplitud');
-legend('Pulso Reconstruido', 'Onda Reconstruida');
-subplot(2,1,2) % 2 rows, 1 column, second position
-plot(eje2, pulso, 'g', eje2, onda_glot*100, 'k');
-title('Pulso y Onda Original');
+legend('Pulso', 'Onda');
+plot(eje2, pulso, 'b', eje2, onda_glot*100, 'r');
+title('Pulso y Onda Resampled');
 xlabel('Tiempo (s)');
 ylabel('Amplitud');
-legend('Pulso Original', 'Onda Original');
+legend('Pulso', 'Onda');
 
 pulso_resampled = pulso_resampled / max(abs(pulso_resampled));
 onda_glot_reconstruida = onda_glot_reconstruida / max(abs(onda_glot_reconstruida));
 
 figure(5);
-subplot(2,1,1) % 2 rows, 1 column, first position
 spectrogram(x, 512, 256, 512, fs, 'yaxis');
 title('Voz Original');
-subplot(2,1,2) % 2 rows, 1 column, second position
+
+figure(6);
 spectrogram(recompuesto, 512, 256, 512, fs, 'yaxis');
 title('Voz Recompuesta');
 
@@ -195,13 +202,10 @@ title('Voz Recompuesta');
 
 tracto = tracto / max(abs(tracto));
 newStr = erase(n_fichero , '.wav'); % Borra el sufijo del number
-audiowrite([newStr, '_tempo_changed.wav'], x_tempo_changed, fs);
-audiowrite([newStr, '_pulso_resampled.wav'], pulso_resampled, fs);
-audiowrite([newStr, '_onda_resampled.wav'], onda_glot_reconstruida, fs);
-
-audiowrite([newStr, '_pulso.wav'], pulso, fs);
-audiowrite([newStr, 'onda.wav'], onda_glot, fs);
-audiowrite([newStr, '_tracto.wav'], tracto, fs);
+audiowrite([n_fichero, '_tempo_changed.wav'], x_tempo_changed, fs);
+audiowrite([n_fichero, '_pulso.wav'], pulso_resampled, fs);
+audiowrite([n_fichero, '_onda.wav'], onda_glot, fs);
+audiowrite([n_fichero, '_tracto.wav'], tracto, fs);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
